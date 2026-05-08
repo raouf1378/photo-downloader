@@ -1,0 +1,59 @@
+name: Download Images with Python
+on:
+  workflow_dispatch:
+    inputs:
+      image_urls:
+        description: 'Enter image URLs separated by commas'
+        required: true
+        default: 'https://via.placeholder.com/150,https://via.placeholder.com/200'
+jobs:
+  run-python-script:
+    runs-on: ubuntu-latest
+steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+- name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+- name: Save input URLs
+        run: echo "URLS='${{ github.event.inputs.image_urls }}'" >> $GITHUB_ENV
+- name: Install requests
+        run: pip install requests
+- name: Download images and zip
+        run: |
+          python - <<EOF
+import os
+import requests
+from zipfile import ZipFile
+def download_images(urls, download_dir='images'):
+    os.makedirs(download_dir, exist_ok=True)
+    for url in urls:
+        filename = os.path.basename(url.split('?')[0])
+        filepath = os.path.join(download_dir, filename)
+        try:
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            with open(filepath, 'wb') as f:
+                for chunk in response.iter_content(1024):
+                    f.write(chunk)
+            print(f"Downloaded {url}")
+        except Exception as e:
+            print(f"Failed to download {url}: {e}")
+def create_zip(zip_name='images.zip', folder='images'):
+    from zipfile import ZipFile
+    with ZipFile(zip_name, 'w') as zipf:
+        for root, _, files in os.walk(folder):
+            for file in files:
+                zipf.write(os.path.join(root, file), arcname=file)
+    print(f"Created ZIP: {zip_name}")
+if __name__ == "__main__":
+    urls = "${URLS}".split(',')
+    download_images(urls)
+    create_zip()
+EOF
+- name: Upload ZIP
+        uses: actions/upload-artifact@v3
+        with:
+          name: images.zip
+          path: images.zip
